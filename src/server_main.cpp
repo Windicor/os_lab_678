@@ -11,24 +11,20 @@ using namespace std;
 #define ERR_TERMINATED 1
 
 Server* server_ptr = nullptr;
-void Terminate(int) {
+void TerminateByUser(int) {
   if (server_ptr != nullptr) {
     server_ptr->~Server();
   }
-  cerr << "Terminated by user or exception" << endl;
-  exit(ERR_TERMINATED);
-}
-
-void Terminate() {
-  Terminate(0);
+  cerr << "Terminated by user" << endl;
+  exit(0);
 }
 
 int main() {
   try {
-    if (signal(SIGINT, Terminate) == SIG_ERR) {
+    if (signal(SIGINT, TerminateByUser) == SIG_ERR) {
       throw runtime_error("Can't set SIGINT signal");
     }
-    if (signal(SIGSEGV, Terminate) == SIG_ERR) {
+    if (signal(SIGSEGV, TerminateByUser) == SIG_ERR) {
       throw runtime_error("Can't set SIGSEGV signal");
     }
 
@@ -41,8 +37,8 @@ int main() {
       cout << cmd << endl;
     }
   } catch (exception& ex) {
-    cerr << "Exctption: " << ex.what() << endl;
-    Terminate();
+    cerr << "Exctption: " << ex.what() << "\nTerminated by exception" << endl;
+    exit(ERR_TERMINATED);
   }
   cerr << "Programm is ended correctly" << endl;
   return 0;

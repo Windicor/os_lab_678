@@ -1,5 +1,6 @@
 #include "m_zmq.h"
 
+#include <string.h>
 #include <unistd.h>
 #include <zmq.h>
 
@@ -50,13 +51,12 @@ void close_zmq_socket(void* socket) {
   }
 }
 
-string create_endpoint(EndpointType type) {
-  string endpoint;
+string create_endpoint(EndpointType type, pid_t id) {
   switch (type) {
     case EndpointType::PARRENT_PUB:
-      return "ipc://tmp/parrent_pub_"s + to_string(getpid());
+      return "ipc://tmp/parrent_pub_"s + to_string(id);
     case EndpointType::CHILD_PUB:
-      return "ipc://tmp/child_pub_"s + to_string(getpid());
+      return "ipc://tmp/child_pub_"s + to_string(id);
     default:
       throw logic_error("Undefined endpoint type");
   }
@@ -84,4 +84,30 @@ void disconnect_zmq_socket(void* socket, string endpoint) {
   if (zmq_disconnect(socket, endpoint.data()) != 0) {
     throw runtime_error("Can't disconnect socket");
   }
+}
+
+void create_zmq_msg(zmq_msg_t* zmq_msg, Message msg) {
+  zmq_msg_init_size(zmq_msg, sizeof(msg));
+  memcpy(zmq_msg_data(zmq_msg), &msg, sizeof(msg));
+}
+
+void send_zmq_msg(void* socket, Message msg) {
+  zmq_msg_t zmq_msg;
+  create_zmq_msg(&zmq_msg, msg);
+  if (!zmq_msg_send(&zmq_msg, socket, 0)) {
+    throw runtime_error("Can't send message");
+  }
+  zmq_msg_close(&zmq_msg);
+}
+
+Message get_zmq_msg(void* socket) {
+  zmq_msg_t zmq_msg;
+  zmq_msg_init(&zmq_msg);
+  if (zmq_msg_recv(&zmq_msg, socket, 0) == -1) {
+    throw runtime_error("Can't recieve message");
+  }
+  Message msg;
+  memcpy(&msg, zmq_msg_data(&zmq_msg), sizeof(Message));
+  zmq_msg_close(&zmq_msg);
+  return msg;
 }

@@ -11,11 +11,15 @@ enum class ConnectionType {
 
 class Socket {
  public:
-  Socket(void* context, SocketType socket_type, EndpointType endpoint_type, ConnectionType connection_type);
+  Socket(void* context, SocketType socket_type, ConnectionType connection_type, std::string endpoint);
   ~Socket();
+
+  void Send(Message message);
+  Message Receive();
 
  private:
   void* socket_;
-  std::string endpoint_;
+  SocketType socket_type_;
   ConnectionType connection_type_;
+  std::string endpoint_;
 };

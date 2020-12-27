@@ -10,9 +10,11 @@ Server::Server() {
   pid_ = getpid();
   cerr << pid_ << " Starting server..." << endl;
   context_ = create_zmq_context();
-  publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, EndpointType::CHILD_PUB, ConnectionType::BIND);
 
-  //sub_socket_ = create_zmq_socket(context_, SocketType::SUBSCRIBER);
+  string endpoint_ = create_endpoint(EndpointType::CHILD_PUB, getpid());
+  publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, ConnectionType::BIND, endpoint_);
+
+  //...
 }
 
 Server::~Server() {
