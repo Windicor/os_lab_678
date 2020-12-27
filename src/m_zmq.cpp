@@ -1,5 +1,6 @@
 #include "m_zmq.h"
 
+#include <errno.h>
 #include <string.h>
 #include <unistd.h>
 #include <zmq.h>
@@ -104,7 +105,7 @@ Message get_zmq_msg(void* socket) {
   zmq_msg_t zmq_msg;
   zmq_msg_init(&zmq_msg);
   if (zmq_msg_recv(&zmq_msg, socket, 0) == -1) {
-    throw runtime_error("Can't recieve message");
+    return Message{CommandType::ERROR, 0, 0};
   }
   Message msg;
   memcpy(&msg, zmq_msg_data(&zmq_msg), sizeof(Message));

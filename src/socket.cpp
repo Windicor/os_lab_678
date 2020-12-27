@@ -1,5 +1,6 @@
 #include "socket.h"
 
+#include <iostream>
 #include <stdexcept>
 
 using namespace std;
@@ -20,18 +21,22 @@ Socket::Socket(void* context, SocketType socket_type, ConnectionType connection_
 }
 
 Socket::~Socket() {
-  switch (connection_type_) {
-    case ConnectionType::BIND:
-      unbind_zmq_socket(socket_, endpoint_);
-      break;
-    case ConnectionType::CONNECT:
-      disconnect_zmq_socket(socket_, endpoint_);
-      break;
+  try {
+    switch (connection_type_) {
+      case ConnectionType::BIND:
+        unbind_zmq_socket(socket_, endpoint_);
+        break;
+      case ConnectionType::CONNECT:
+        disconnect_zmq_socket(socket_, endpoint_);
+        break;
+    }
+    close_zmq_socket(socket_);
+  } catch (exception& ex) {
+    cerr << "Socket wasn't close: " << ex.what() << endl;
   }
-  close_zmq_socket(socket_);
 }
 
-void Socket::Send(Message message) {
+void Socket::send(Message message) {
   if (socket_type_ == SocketType::PUBLISHER) {
     send_zmq_msg(socket_, message);
   } else {
@@ -39,7 +44,7 @@ void Socket::Send(Message message) {
   }
 }
 
-Message Socket::Receive() {
+Message Socket::receive() {
   if (socket_type_ == SocketType::SUBSCRIBER) {
     return get_zmq_msg(socket_);
   } else {

@@ -24,6 +24,7 @@ void connect_zmq_socket(void* socket, std::string endpoint);
 void disconnect_zmq_socket(void* socket, std::string endpoint);
 
 enum class CommandType {
+  ERROR,
   REQ_REP
 };
 

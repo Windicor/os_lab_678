@@ -22,4 +22,5 @@ class Server {
   std::unique_ptr<Socket> subscriber_;
 
   pthread_t receive_msg_loop_id;
+  bool terminated_ = false;
 };

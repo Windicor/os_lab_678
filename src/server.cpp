@@ -18,19 +18,34 @@ void* receive_msg_loop(void* serv_arg) {
   Server* server_ptr = (Server*)serv_arg;
   pid_t server_pid = server_ptr->pid();
   try {
-    pid_t pid = fork();
-    if (pid == -1) {
+    pid_t child_pid = fork();
+    if (child_pid == -1) {
       throw runtime_error("Can't fork");
     }
-    if (pid == 0) {
+    if (child_pid == 0) {
       execl(CLIENT_EXE.data(), CLIENT_EXE.data(), NULL);
       kill(server_pid, SIGABRT);
       exit(ERR_EXEC);
     }
-    //cerr << "My id is " << server_ptr->pid() << " child id is " << pid << endl;
+
+    string endpoint = create_endpoint(EndpointType::CHILD_PUB, child_pid);
+    server_ptr->subscriber_ = make_unique<Socket>(server_ptr->context_, SocketType::SUBSCRIBER, ConnectionType::CONNECT, endpoint);
+
+    while (true) {
+      Message msg = server_ptr->subscriber_->receive();
+      if (msg.command == CommandType::ERROR) {
+        if (server_ptr->terminated_) {
+          return NULL;
+        } else {
+          cerr << "This bom" << endl;
+          throw runtime_error("Can't receive message");
+        }
+      }
+      cout << "Message on server: " << static_cast<int>(msg.command) << " " << msg.to_id << " " << msg.value << endl;
+    }
 
   } catch (exception& ex) {
-    cerr << "Exctption: " << ex.what() << "\nTerminated by exception on server receive loop" << endl;
+    cerr << "Server exctption: " << ex.what() << "\nTerminated by exception on server receive loop" << endl;
     exit(ERR_LOOP);
   }
   return NULL;
@@ -41,8 +56,8 @@ Server::Server() {
   cerr << to_string(pid_) + " Starting server..."s << endl;
   context_ = create_zmq_context();
 
-  string endpoint_ = create_endpoint(EndpointType::CHILD_PUB, getpid());
-  publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, ConnectionType::BIND, endpoint_);
+  string endpoint = create_endpoint(EndpointType::CHILD_PUB, getpid());
+  publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, ConnectionType::BIND, endpoint);
 
   if (pthread_create(&receive_msg_loop_id, 0, receive_msg_loop, this) != 0) {
     throw runtime_error("Can't run second thread");
@@ -50,11 +65,20 @@ Server::Server() {
 }
 
 Server::~Server() {
-  cerr << to_string(pid_) + " Destroying server..."s << endl;
+  if (terminated_) {
+    return;
+  }
 
-  publiser_ = nullptr;
-  subscriber_ = nullptr;
-  destroy_zmq_context(context_);
+  cerr << to_string(pid_) + " Destroying server..."s << endl;
+  terminated_ = true;
+
+  try {
+    publiser_ = nullptr;
+    subscriber_ = nullptr;
+    destroy_zmq_context(context_);
+  } catch (exception& ex) {
+    cerr << "Server wasn't destroyed: " << ex.what() << endl;
+  }
 }
 
 pid_t Server::pid() const {
