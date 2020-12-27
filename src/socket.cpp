@@ -32,9 +32,17 @@ Socket::~Socket() {
 }
 
 void Socket::Send(Message message) {
-  send_zmq_msg(socket_, message);
+  if (socket_type_ == SocketType::PUBLISHER) {
+    send_zmq_msg(socket_, message);
+  } else {
+    throw logic_error("SUB socket can't send messages");
+  }
 }
 
 Message Socket::Receive() {
-  return get_zmq_msg(socket_);
+  if (socket_type_ == SocketType::SUBSCRIBER) {
+    return get_zmq_msg(socket_);
+  } else {
+    throw logic_error("PUB socket can't receive messages");
+  }
 }

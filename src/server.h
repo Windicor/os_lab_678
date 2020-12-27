@@ -13,9 +13,13 @@ class Server {
 
   pid_t pid() const;
 
+  friend void* receive_msg_loop(void* serv_arg);
+
  private:
   pid_t pid_;
   void* context_ = nullptr;
   std::unique_ptr<Socket> publiser_;
   std::unique_ptr<Socket> subscriber_;
+
+  pthread_t receive_msg_loop_id;
 };
