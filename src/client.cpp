@@ -1,0 +1,3 @@
+void DDDD() {
+  int a;
+}
