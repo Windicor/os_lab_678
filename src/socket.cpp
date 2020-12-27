@@ -32,7 +32,7 @@ Socket::~Socket() {
     }
     close_zmq_socket(socket_);
   } catch (exception& ex) {
-    cerr << "Socket wasn't close: " << ex.what() << endl;
+    cerr << "Socket wasn't closed: " << ex.what() << endl;
   }
 }
 

@@ -20,14 +20,6 @@ void TerminateByUser(int) {
   exit(0);
 }
 
-void TerminateByAbort(int) {
-  if (server_ptr != nullptr) {
-    server_ptr->~Server();
-  }
-  cerr << "Terminated by abort (check client exec file)" << endl;
-  exit(ERR_ABORTED);
-}
-
 int main() {
   try {
     if (signal(SIGINT, TerminateByUser) == SIG_ERR) {
@@ -35,9 +27,6 @@ int main() {
     }
     if (signal(SIGSEGV, TerminateByUser) == SIG_ERR) {
       throw runtime_error("Can't set SIGSEGV signal");
-    }
-    if (signal(SIGABRT, TerminateByAbort) == SIG_ERR) {
-      throw runtime_error("Can't set SIGABRT signal");
     }
 
     Server server;

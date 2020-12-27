@@ -24,7 +24,8 @@ void* receive_msg_loop(void* serv_arg) {
     }
     if (child_pid == 0) {
       execl(CLIENT_EXE.data(), CLIENT_EXE.data(), NULL);
-      kill(server_pid, SIGABRT);
+      cerr << "Can't execl "s + CLIENT_EXE << endl;
+      kill(server_pid, SIGINT);
       exit(ERR_EXEC);
     }
 
@@ -66,6 +67,7 @@ Server::Server() {
 
 Server::~Server() {
   if (terminated_) {
+    cerr << "Double termination" << endl;
     return;
   }
 
@@ -75,6 +77,7 @@ Server::~Server() {
   try {
     publiser_ = nullptr;
     subscriber_ = nullptr;
+    //sleep(0.3);
     destroy_zmq_context(context_);
   } catch (exception& ex) {
     cerr << "Server wasn't destroyed: " << ex.what() << endl;
