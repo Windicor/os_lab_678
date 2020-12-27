@@ -17,6 +17,8 @@ class Socket {
   void send(Message message);
   Message receive();
 
+  std::string endpoint() const;
+
  private:
   void* socket_;
   SocketType socket_type_;

@@ -23,13 +23,13 @@ void* receive_msg_loop(void* serv_arg) {
       throw runtime_error("Can't fork");
     }
     if (child_pid == 0) {
-      execl(CLIENT_EXE.data(), CLIENT_EXE.data(), NULL);
+      execl(CLIENT_EXE.data(), CLIENT_EXE.data(), "0", server_ptr->publiser_->endpoint().data(), NULL);
       cerr << "Can't execl "s + CLIENT_EXE << endl;
       kill(server_pid, SIGINT);
       exit(ERR_EXEC);
     }
 
-    string endpoint = create_endpoint(EndpointType::CHILD_PUB, child_pid);
+    string endpoint = create_endpoint(EndpointType::PARRENT_PUB, child_pid);
     server_ptr->subscriber_ = make_unique<Socket>(server_ptr->context_, SocketType::SUBSCRIBER, ConnectionType::CONNECT, endpoint);
 
     while (true) {
@@ -67,7 +67,7 @@ Server::Server() {
 
 Server::~Server() {
   if (terminated_) {
-    cerr << "Double termination" << endl;
+    cerr << to_string(pid_) + " Server double termination" << endl;
     return;
   }
 
@@ -77,11 +77,18 @@ Server::~Server() {
   try {
     publiser_ = nullptr;
     subscriber_ = nullptr;
-    //sleep(0.3);
     destroy_zmq_context(context_);
   } catch (exception& ex) {
     cerr << "Server wasn't destroyed: " << ex.what() << endl;
   }
+}
+
+void Server::send(Message message) {
+  publiser_->send(message);
+}
+
+Message Server::receive() {
+  return subscriber_->receive();
 }
 
 pid_t Server::pid() const {

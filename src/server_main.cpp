@@ -9,7 +9,6 @@
 using namespace std;
 
 const int ERR_TERMINATED = 1;
-const int ERR_ABORTED = 1;
 
 Server* server_ptr = nullptr;
 void TerminateByUser(int) {
@@ -31,17 +30,17 @@ int main() {
 
     Server server;
     server_ptr = &server;
-    cerr << "Server is started correctly" << endl;
+    cerr << to_string(getpid()) + " Server is started correctly"s << endl;
 
-    string cmd;
+    int cmd;
     while (cin >> cmd) {
-      cout << cmd << endl;
+      server.send(Message{CommandType::REQ_REP, cmd, cmd});
     }
 
   } catch (exception& ex) {
-    cerr << "Server exception: " << ex.what() << "\nTerminated by exception" << endl;
+    cerr << to_string(getpid()) + " Server exception: "s << ex.what() << "\nTerminated by exception" << endl;
     exit(ERR_TERMINATED);
   }
-  cerr << "Programm is ended correctly" << endl;
+  cerr << to_string(getpid()) + " Server is ended correctly"s << endl;
   return 0;
 }

@@ -51,3 +51,7 @@ Message Socket::receive() {
     throw logic_error("PUB socket can't receive messages");
   }
 }
+
+string Socket::endpoint() const {
+  return endpoint_;
+}

@@ -13,6 +13,9 @@ class Server {
 
   pid_t pid() const;
 
+  void send(Message message);
+  Message receive();
+
   friend void* receive_msg_loop(void* serv_arg);
 
  private:
