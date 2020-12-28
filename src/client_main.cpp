@@ -40,6 +40,19 @@ void process_msg(Client& client, const Message msg) {
       TerminateByUser(0);
       break;
     }
+    case CommandType::TIMER_START:
+      client.start_timer();
+      client.send_up(msg);
+      break;
+    case CommandType::TIMER_STOP:
+      client.stop_timer();
+      client.send_up(msg);
+      break;
+    case CommandType::TIMER_TIME: {
+      int val = client.get_time();
+      client.send_up(Message(CommandType::TIMER_TIME, client.id(), val));
+      break;
+    }
     default:
       throw logic_error("Not implemented message command");
   }

@@ -58,6 +58,16 @@ void* second_thread(void* serv_arg) {
           server_ptr->tree_.remove(msg.to_id);
           cout << "OK" << endl;
           break;
+        case CommandType::TIMER_START:
+          cout << "OK:" << msg.to_id << endl;
+          break;
+        case CommandType::TIMER_STOP:
+          cout << "OK:" << msg.to_id << endl;
+          break;
+        case CommandType::TIMER_TIME: {
+          cout << "OK:" << msg.to_id << ": " << msg.value << endl;
+          break;
+        }
         default:
           break;
       }
@@ -152,7 +162,7 @@ void Server::create_child_cmd(int id, int parrent_id) {
 
 void Server::remove_child_cmd(int id) {
   if (id == 0) {
-    cerr << "Can't remove zero child" << endl;
+    cout << "Can't remove zero child" << endl;
     return;
   }
   if (!tree_.find(id)) {
@@ -164,6 +174,18 @@ void Server::remove_child_cmd(int id) {
     return;
   }
   send(Message(CommandType::REMOVE_CHILD, id, 0));
+}
+
+void Server::exec_cmd(int id, CommandType type) {
+  if (!tree_.find(id)) {
+    cout << "Error: Not found" << endl;
+    return;
+  }
+  if (!check(id)) {
+    cout << "Error: Node is unavailable" << endl;
+    return;
+  }
+  send(Message(type, id, 0));
 }
 
 void Server::print_tree() {

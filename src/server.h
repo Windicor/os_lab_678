@@ -21,6 +21,7 @@ class Server {
   bool check(int id);
   void create_child_cmd(int id, int parrent_id);
   void remove_child_cmd(int id);
+  void exec_cmd(int id, CommandType type);
   void print_tree();
 
   friend void* second_thread(void* serv_arg);

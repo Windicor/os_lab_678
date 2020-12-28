@@ -27,7 +27,10 @@ enum class CommandType {
   ERROR,
   RETURN,
   CREATE_CHILD,
-  REMOVE_CHILD
+  REMOVE_CHILD,
+  TIMER_TIME,
+  TIMER_START,
+  TIMER_STOP
 };
 
 struct Message {

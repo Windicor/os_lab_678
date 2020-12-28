@@ -35,6 +35,22 @@ void process_cmd(Server& server, string cmd) {
     int id;
     cin >> id;
     server.remove_child_cmd(id);
+  } else if (cmd == "exec") {
+    int id;
+    string sub_cmd;
+    cin >> id >> sub_cmd;
+    CommandType type;
+    if (sub_cmd == "time") {
+      type = CommandType::TIMER_TIME;
+    } else if (sub_cmd == "start") {
+      type = CommandType::TIMER_START;
+    } else if (sub_cmd == "stop") {
+      type = CommandType::TIMER_STOP;
+    } else {
+      cout << "Incorrect subcommand" << endl;
+      return;
+    }
+    server.exec_cmd(id, type);
   } else if (cmd == "print_tree") {
     server.print_tree();
   } else {
