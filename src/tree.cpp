@@ -74,6 +74,15 @@ void IdTreeNode::print(std::ostream& out, int depth) const {
   }
 }
 
+std::unordered_set<pid_t> IdTreeNode::get_all() const {
+  std::unordered_set<pid_t> res;
+  for (const auto& ptr : childs_) {
+    res.insert(ptr->id().second);
+    res.merge(ptr->get_all());
+  }
+  return res;
+}
+
 std::pair<int, pid_t> IdTreeNode::id() const {
   return id_;
 }
@@ -119,4 +128,14 @@ void IdTree::print(std::ostream& out) const {
     out << "(" << head_->id().first << " " << head_->id().second << ")\n";
     head_->print(out, 1);
   }
+}
+
+std::unordered_set<pid_t> IdTree::get_all() const {
+  if (head_) {
+    std::unordered_set<pid_t> res;
+    res.insert(head_->id().second);
+    res.merge(head_->get_all());
+    return res;
+  }
+  return {};
 }

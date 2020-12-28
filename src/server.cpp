@@ -77,6 +77,10 @@ Server::~Server() {
   cerr << to_string(pid_) + " Destroying server..."s << endl;
   terminated_ = true;
 
+  for (pid_t pid : tree_.get_all()) {
+    kill(pid, SIGINT);
+  }
+
   try {
     publiser_ = nullptr;
     subscriber_ = nullptr;

@@ -14,7 +14,7 @@ void TerminateByUser(int) {
   if (client_ptr != nullptr) {
     client_ptr->~Client();
   }
-  cerr << to_string(getpid()) + " Terminated by user"s << endl;
+  //cerr << to_string(getpid()) + " Terminated by user"s << endl;
   exit(0);
 }
 

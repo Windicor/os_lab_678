@@ -1,11 +1,11 @@
 #pragma once
 
+#include <unistd.h>
+
 #include <iostream>
 #include <memory>
 #include <unordered_set>
 #include <utility>
-
-using pid_t = int;
 
 const std::pair<int, pid_t> BAD_RES = {-1, -1};
 
@@ -18,6 +18,7 @@ class IdTreeNode {
   bool find(int id) const;
   std::pair<int, pid_t> get(int id) const;
   void print(std::ostream& out, int depth) const;
+  std::unordered_set<pid_t> get_all() const;
 
   std::pair<int, pid_t> id() const;
 
@@ -33,6 +34,7 @@ class IdTree {
   bool find(int id) const;
   std::pair<int, pid_t> get(int id) const;
   void print(std::ostream& out = std::cout) const;
+  std::unordered_set<pid_t> get_all() const;
 
  private:
   std::shared_ptr<IdTreeNode> head_;
