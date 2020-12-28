@@ -31,6 +31,10 @@ void process_cmd(Server& server, string cmd) {
     int id, parrent_id;
     cin >> id >> parrent_id;
     server.create_child_cmd(id, parrent_id);
+  } else if (cmd == "remove") {
+    int id;
+    cin >> id;
+    server.remove_child_cmd(id);
   } else {
     cout << "It's not a command" << endl;
   }

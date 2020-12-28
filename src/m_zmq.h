@@ -26,7 +26,8 @@ void disconnect_zmq_socket(void* socket, std::string endpoint);
 enum class CommandType {
   ERROR,
   RETURN,
-  CREATE_CHILD
+  CREATE_CHILD,
+  REMOVE_CHILD
 };
 
 struct Message {

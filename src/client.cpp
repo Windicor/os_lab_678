@@ -37,6 +37,7 @@ Client::~Client() {
   cerr << to_string(pid_) + " Destroying client..."s << endl;
   terminated_ = true;
 
+  sleep(MESSAGE_WAITING_TIME);
   try {
     child_publiser_ = nullptr;
     parrent_publiser_ = nullptr;

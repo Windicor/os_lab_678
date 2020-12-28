@@ -8,28 +8,38 @@
 using namespace std;
 
 const int ERR_TERMINATED = 1;
+const int UNIVERSAL_MESSAGE_ID = -256;
 
 Client* client_ptr = nullptr;
 void TerminateByUser(int) {
   if (client_ptr != nullptr) {
     client_ptr->~Client();
   }
-  //cerr << to_string(getpid()) + " Terminated by user"s << endl;
+  cerr << to_string(getpid()) + " Terminated by user"s << endl;
   exit(0);
 }
 
-void process_msg(Client& client, Message msg) {
+void process_msg(Client& client, const Message msg) {
+  cerr << to_string(getpid()) + " Client message: "s << static_cast<int>(msg.command) << " " << msg.to_id << " " << msg.value << endl;
   switch (msg.command) {
     case CommandType::ERROR:
       throw runtime_error("Error message recieved");
     case CommandType::RETURN:
-      cout << to_string(getpid()) + " Client message: "s << static_cast<int>(msg.command) << " " << msg.to_id << " " << msg.value << endl;
       client.send_up(msg);
       break;
     case CommandType::CREATE_CHILD:
-      cout << to_string(getpid()) + " Client message: "s << static_cast<int>(msg.command) << " " << msg.to_id << " " << msg.value << endl;
       client.add_child(msg.value);
       break;
+    case CommandType::REMOVE_CHILD: {
+      if (msg.to_id != UNIVERSAL_MESSAGE_ID) {
+        client.send_up(msg);
+      }
+      Message tmp = msg;
+      tmp.to_id = UNIVERSAL_MESSAGE_ID;
+      client.send_down(tmp);
+      TerminateByUser(0);
+      break;
+    }
     default:
       throw logic_error("Not implemented message command");
   }
@@ -55,7 +65,7 @@ int main(int argc, char const* argv[]) {
 
     while (true) {
       Message msg = client.receive();
-      if (msg.to_id != client.id()) {
+      if (msg.to_id != client.id() && msg.to_id != UNIVERSAL_MESSAGE_ID) {
         if (msg.go_up) {
           client.send_up(msg);
         } else {

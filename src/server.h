@@ -20,6 +20,7 @@ class Server {
 
   bool check(int id);
   void create_child_cmd(int id, int parrent_id);
+  void remove_child_cmd(int id);
 
   friend void* receive_msg_loop(void* serv_arg);
 

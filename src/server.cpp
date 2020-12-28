@@ -45,7 +45,7 @@ void* receive_msg_loop(void* serv_arg) {
         }
       }
       server_ptr->last_message_ = msg;
-      cout << "Message on server: " << static_cast<int>(msg.command) << " " << msg.to_id << " " << msg.value << endl;
+      cerr << "Message on server: " << static_cast<int>(msg.command) << " " << msg.to_id << " " << msg.value << endl;
     }
 
   } catch (exception& ex) {
@@ -120,11 +120,11 @@ bool Server::check(int id) {
 
 void Server::create_child_cmd(int id, int parrent_id) {
   if (tree_.find(id)) {
-    cout << "«Error: Already exists" << endl;
+    cout << "Error: Already exists" << endl;
     return;
   }
   if (!tree_.find(parrent_id)) {
-    cout << "«Error: Parent not found" << endl;
+    cout << "Error: Parent not found" << endl;
     return;
   }
   if (!check(parrent_id)) {
@@ -138,5 +138,28 @@ void Server::create_child_cmd(int id, int parrent_id) {
     cout << "OK: " << last_message_.value << endl;
   } else {
     cout << "Error: New child is unavailable" << endl;
+  }
+}
+
+void Server::remove_child_cmd(int id) {
+  if (id == 0) {
+    cerr << "Can't remove zero child" << endl;
+    return;
+  }
+  if (!tree_.find(id)) {
+    cout << "Error: Not found" << endl;
+    return;
+  }
+  if (!check(id)) {
+    cout << "Error: Node is unavailable" << endl;
+    return;
+  }
+  send(Message(CommandType::REMOVE_CHILD, id, 0));
+  sleep(2 * MESSAGE_WAITING_TIME);
+  if (last_message_.command == CommandType::REMOVE_CHILD) {
+    tree_.remove(id);
+    cout << "OK" << endl;
+  } else {
+    cout << "Error: Node is unavailable" << endl;
   }
 }
