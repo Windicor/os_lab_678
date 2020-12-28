@@ -73,11 +73,20 @@ void IdTreeNode::print(std::ostream& out, int depth) const {
   }
 }
 
-std::unordered_set<pid_t> IdTreeNode::get_all() const {
+std::unordered_set<pid_t> IdTreeNode::get_all_second() const {
   std::unordered_set<pid_t> res;
   for (const auto& ptr : childs_) {
     res.insert(ptr->id().second);
-    res.merge(ptr->get_all());
+    res.merge(ptr->get_all_second());
+  }
+  return res;
+}
+
+std::unordered_set<pid_t> IdTreeNode::get_all_first() const {
+  std::unordered_set<pid_t> res;
+  for (const auto& ptr : childs_) {
+    res.insert(ptr->id().first);
+    res.merge(ptr->get_all_first());
   }
   return res;
 }
@@ -129,11 +138,21 @@ void IdTree::print(std::ostream& out) const {
   }
 }
 
-std::unordered_set<pid_t> IdTree::get_all() const {
+std::unordered_set<pid_t> IdTree::get_all_second() const {
   if (head_) {
     std::unordered_set<pid_t> res;
     res.insert(head_->id().second);
-    res.merge(head_->get_all());
+    res.merge(head_->get_all_second());
+    return res;
+  }
+  return {};
+}
+
+std::unordered_set<pid_t> IdTree::get_all_first() const {
+  if (head_) {
+    std::unordered_set<pid_t> res;
+    res.insert(head_->id().first);
+    res.merge(head_->get_all_first());
     return res;
   }
   return {};

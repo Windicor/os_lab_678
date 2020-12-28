@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include <memory>
+#include <unordered_map>
 
 #include "socket.h"
 #include "tree.h"
@@ -22,6 +23,7 @@ class Server {
   void create_child_cmd(int id, int parrent_id);
   void remove_child_cmd(int id);
   void exec_cmd(int id, CommandType type);
+  void heartbit_cmd(int time);
   void print_tree();
 
   friend void* second_thread(void* serv_arg);
@@ -37,4 +39,5 @@ class Server {
 
   Message last_message_;
   IdTree tree_;
+  std::unordered_map<int, bool> map_for_check_;
 };

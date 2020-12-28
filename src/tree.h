@@ -18,7 +18,8 @@ class IdTreeNode {
   bool find(int id) const;
   std::pair<int, pid_t>& get(int id);
   void print(std::ostream& out, int depth) const;
-  std::unordered_set<pid_t> get_all() const;
+  std::unordered_set<pid_t> get_all_second() const;
+  std::unordered_set<int> get_all_first() const;
 
   std::pair<int, pid_t> id() const;
 
@@ -34,7 +35,8 @@ class IdTree {
   bool find(int id) const;
   std::pair<int, pid_t>& get(int id);
   void print(std::ostream& out = std::cout) const;
-  std::unordered_set<pid_t> get_all() const;
+  std::unordered_set<pid_t> get_all_second() const;
+  std::unordered_set<int> get_all_first() const;
 
  private:
   std::shared_ptr<IdTreeNode> head_;

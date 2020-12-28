@@ -20,24 +20,13 @@ class Client {
   void send_down(Message message);
   Message receive();
 
-  void start_timer() {
-    is_timer_started = true;
-    start_ = std::chrono::steady_clock::now();
-  }
+  void start_timer();
+  void stop_timer();
+  int get_time();
+  void heartbit(int time);
 
-  void stop_timer() {
-    is_timer_started = false;
-    finish_ = std::chrono::steady_clock::now();
-  }
-
-  int get_time() {
-    if (is_timer_started) {
-      finish_ = std::chrono::steady_clock::now();
-    }
-    return std::chrono::duration_cast<std::chrono::milliseconds>(finish_ - start_).count();
-  }
-
-  void add_child(int id);
+  void
+  add_child(int id);
 
  private:
   int id_;

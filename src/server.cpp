@@ -14,6 +14,7 @@ const int ERR_LOOP = 2;
 const int ERR_EXEC = 3;
 const string CLIENT_EXE = "./client";
 const double MESSAGE_WAITING_TIME = 1;
+const int UNIVERSAL_MESSAGE_ID = -256;
 
 void* second_thread(void* serv_arg) {
   Server* server_ptr = (Server*)serv_arg;
@@ -68,6 +69,9 @@ void* second_thread(void* serv_arg) {
           cout << "OK:" << msg.to_id << ": " << msg.value << endl;
           break;
         }
+        case CommandType::HEARTBIT:
+          server_ptr->map_for_check_[msg.to_id] = true;
+          break;
         default:
           break;
       }
@@ -102,7 +106,7 @@ Server::~Server() {
   cerr << to_string(pid_) + " Destroying server..."s << endl;
   terminated_ = true;
 
-  for (pid_t pid : tree_.get_all()) {
+  for (pid_t pid : tree_.get_all_second()) {
     kill(pid, SIGINT);
   }
 
@@ -186,6 +190,25 @@ void Server::exec_cmd(int id, CommandType type) {
     return;
   }
   send(Message(type, id, 0));
+}
+
+void Server::heartbit_cmd(int time) {
+  if (time < 1000) {
+    cout << "Too low time for heartbit" << endl;
+  }
+  send(Message(CommandType::HEARTBIT, UNIVERSAL_MESSAGE_ID, time));
+  auto uset = tree_.get_all_first();
+  for (int id : uset) {
+    map_for_check_[id] = false;
+  }
+  sleep(4 * (double)time / 1000);
+  for (auto& [id, bit] : map_for_check_) {
+    if (!bit) {
+      cout << "Heartbit: node " << id << " is unavailable now" << endl;
+    }
+    bit = false;
+  }
+  cout << "OK" << endl;
 }
 
 void Server::print_tree() {

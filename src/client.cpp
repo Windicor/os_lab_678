@@ -77,6 +77,28 @@ void Client::add_child(int id) {
   subscriber_->subscribe(endpoint);
 }
 
+void Client::start_timer() {
+  is_timer_started = true;
+  start_ = std::chrono::steady_clock::now();
+}
+
+void Client::stop_timer() {
+  is_timer_started = false;
+  finish_ = std::chrono::steady_clock::now();
+}
+
+int Client::get_time() {
+  if (is_timer_started) {
+    finish_ = std::chrono::steady_clock::now();
+  }
+  return std::chrono::duration_cast<std::chrono::milliseconds>(finish_ - start_).count();
+}
+
+void Client::heartbit(int time) {
+  sleep((double)time / 1000);  //s to ms
+  send_up(Message(CommandType::HEARTBIT, id_, 0));
+}
+
 int Client::id() const {
   return id_;
 }

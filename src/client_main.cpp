@@ -53,6 +53,10 @@ void process_msg(Client& client, const Message msg) {
       client.send_up(Message(CommandType::TIMER_TIME, client.id(), val));
       break;
     }
+    case CommandType::HEARTBIT:
+      client.send_down(msg);
+      client.heartbit(msg.value);
+      break;
     default:
       throw logic_error("Not implemented message command");
   }

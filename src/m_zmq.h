@@ -30,7 +30,8 @@ enum class CommandType {
   REMOVE_CHILD,
   TIMER_TIME,
   TIMER_START,
-  TIMER_STOP
+  TIMER_STOP,
+  HEARTBIT
 };
 
 struct Message {

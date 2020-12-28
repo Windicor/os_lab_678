@@ -51,6 +51,10 @@ void process_cmd(Server& server, string cmd) {
       return;
     }
     server.exec_cmd(id, type);
+  } else if (cmd == "heartbit") {
+    int time;
+    cin >> time;
+    server.heartbit_cmd(time);
   } else if (cmd == "print_tree") {
     server.print_tree();
   } else {
