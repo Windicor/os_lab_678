@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "socket.h"
+#include "tree.h"
 
 class Server {
  public:
@@ -16,6 +17,9 @@ class Server {
 
   void send(Message message);
   Message receive();
+
+  bool check(int id);
+  void create_child_cmd(int id, int parrent_id);
 
   friend void* receive_msg_loop(void* serv_arg);
 
@@ -29,4 +33,5 @@ class Server {
   bool terminated_ = false;
 
   Message last_message_;
+  IdTree tree_;
 };

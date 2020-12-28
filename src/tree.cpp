@@ -38,12 +38,27 @@ bool IdTreeNode::remove(int id) {
   }
 }
 
-std::pair<int, pid_t> IdTreeNode::find(int id) const {
+bool IdTreeNode::find(int id) const {
+  if (id_.first == id) {
+    return true;
+  } else {
+    bool is_ok = false;
+    for (const auto& ch_ptr : childs_) {
+      is_ok = is_ok || ch_ptr->find(id);
+      if (is_ok) {
+        return true;
+      }
+    }
+    return is_ok;
+  }
+}
+
+std::pair<int, pid_t> IdTreeNode::get(int id) const {
   if (id_.first == id) {
     return id_;
   } else {
     for (const auto& ch_ptr : childs_) {
-      std::pair<int, pid_t> res = ch_ptr->find(id);
+      std::pair<int, pid_t> res = ch_ptr->get(id);
       if (res.first != BAD_RES.first || res.second != BAD_RES.second) {
         return res;
       }
@@ -63,30 +78,45 @@ std::pair<int, pid_t> IdTreeNode::id() const {
   return id_;
 }
 
-IdTree::IdTree() {
-  head_ = std::make_shared<IdTreeNode>(std::pair<int, pid_t>{0, 0});
-}
-
 bool IdTree::add_to(int parrent_id, std::pair<int, pid_t> new_id) {
-  if (find(new_id.first) != BAD_RES) {
+  if (!head_) {
+    head_ = std::make_shared<IdTreeNode>(new_id);
+    return true;
+  }
+  if (find(new_id.first)) {
     return false;
   }
   return head_->add_to(parrent_id, new_id);
 }
 
 bool IdTree::remove(int id) {
-  if (id == head_->id().first) {
-    head_ = std::make_shared<IdTreeNode>();
-    return true;
+  if (head_) {
+    if (id == head_->id().first) {
+      head_ = nullptr;
+      return true;
+    }
+    return head_->remove(id);
   }
-  return head_->remove(id);
+  return false;
 }
 
-std::pair<int, pid_t> IdTree::find(int id) const {
-  return head_->find(id);
+bool IdTree::find(int id) const {
+  if (head_) {
+    return head_->find(id);
+  }
+  return false;
+}
+
+std::pair<int, pid_t> IdTree::get(int id) const {
+  if (head_) {
+    return head_->get(id);
+  }
+  return BAD_RES;
 }
 
 void IdTree::print(std::ostream& out) const {
-  out << head_->id().first << " " << head_->id().second << "\n";
-  head_->print(out, 1);
+  if (head_) {
+    out << "(" << head_->id().first << " " << head_->id().second << ")\n";
+    head_->print(out, 1);
+  }
 }

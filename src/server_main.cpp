@@ -4,12 +4,10 @@
 #include <string>
 
 #include "server.h"
-#include "tree.h"
 
 using namespace std;
 
 const int ERR_TERMINATED = 1;
-const double MESSAGE_WAITING_TIME = 1;
 
 Server* server_ptr = nullptr;
 void TerminateByUser(int) {
@@ -22,12 +20,9 @@ void TerminateByUser(int) {
 
 void process_cmd(Server& server, string cmd) {
   if (cmd == "check") {
-    int to_id, value;
-    cin >> to_id >> value;
-    Message msg(CommandType::RETURN, to_id, value);
-    server.send(msg);
-    sleep(MESSAGE_WAITING_TIME);
-    if (server.last_message() == msg) {
+    int id;
+    cin >> id;
+    if (server.check(id)) {
       cout << "OK" << endl;
     } else {
       cout << "NOT_OK" << endl;
@@ -35,7 +30,7 @@ void process_cmd(Server& server, string cmd) {
   } else if (cmd == "create") {
     int id, parrent_id;
     cin >> id >> parrent_id;
-    server.send(Message(CommandType::CREATE_CHILD, parrent_id, id));
+    server.create_child_cmd(id, parrent_id);
   } else {
     cout << "It's not a command" << endl;
   }

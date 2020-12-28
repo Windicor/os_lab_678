@@ -1,3 +1,5 @@
+#include <signal.h>
+
 #include <iostream>
 #include <string>
 
@@ -6,6 +8,15 @@
 using namespace std;
 
 const int ERR_TERMINATED = 1;
+
+Client* client_ptr = nullptr;
+void TerminateByUser(int) {
+  if (client_ptr != nullptr) {
+    client_ptr->~Client();
+  }
+  cerr << to_string(getpid()) + " Terminated by user"s << endl;
+  exit(0);
+}
 
 void process_msg(Client& client, Message msg) {
   switch (msg.command) {
@@ -16,7 +27,7 @@ void process_msg(Client& client, Message msg) {
       client.send_up(msg);
       break;
     case CommandType::CREATE_CHILD:
-      client.send_up(msg);
+      cout << to_string(getpid()) + " Client message: "s << static_cast<int>(msg.command) << " " << msg.to_id << " " << msg.value << endl;
       client.add_child(msg.value);
       break;
     default:
@@ -31,7 +42,15 @@ int main(int argc, char const* argv[]) {
   }
 
   try {
+    if (signal(SIGINT, TerminateByUser) == SIG_ERR) {
+      throw runtime_error("Can't set SIGINT signal");
+    }
+    if (signal(SIGSEGV, TerminateByUser) == SIG_ERR) {
+      throw runtime_error("Can't set SIGSEGV signal");
+    }
+
     Client client(stoi(argv[1]), string(argv[2]));
+    client_ptr = &client;
     cerr << to_string(getpid()) + " Client is started correctly"s << endl;
 
     while (true) {

@@ -9,6 +9,7 @@
 using namespace std;
 
 const string CLIENT_EXE = "./client";
+const double MESSAGE_WAITING_TIME = 1;
 
 Client::Client(int id, std::string parrent_endpoint) {
   id_ = id;
@@ -22,6 +23,9 @@ Client::Client(int id, std::string parrent_endpoint) {
   parrent_publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, endpoint);
 
   subscriber_ = make_unique<Socket>(context_, SocketType::SUBSCRIBER, parrent_endpoint);
+
+  sleep(MESSAGE_WAITING_TIME);
+  send_up(Message(CommandType::CREATE_CHILD, id, getpid()));
 }
 
 Client::~Client() {

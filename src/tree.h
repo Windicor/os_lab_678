@@ -15,7 +15,8 @@ class IdTreeNode {
 
   bool add_to(int parrent_id, std::pair<int, pid_t> new_id);
   bool remove(int id);
-  std::pair<int, pid_t> find(int id) const;
+  bool find(int id) const;
+  std::pair<int, pid_t> get(int id) const;
   void print(std::ostream& out, int depth) const;
 
   std::pair<int, pid_t> id() const;
@@ -27,11 +28,10 @@ class IdTreeNode {
 
 class IdTree {
  public:
-  IdTree();
-
   bool add_to(int parrent_id, std::pair<int, pid_t> new_id);
   bool remove(int id);
-  std::pair<int, pid_t> find(int id) const;
+  bool find(int id) const;
+  std::pair<int, pid_t> get(int id) const;
   void print(std::ostream& out = std::cout) const;
 
  private:

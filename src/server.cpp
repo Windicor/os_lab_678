@@ -13,6 +13,7 @@ using namespace std;
 const int ERR_LOOP = 2;
 const int ERR_EXEC = 3;
 const string CLIENT_EXE = "./client";
+const double MESSAGE_WAITING_TIME = 1;
 
 void* receive_msg_loop(void* serv_arg) {
   Server* server_ptr = (Server*)serv_arg;
@@ -31,6 +32,7 @@ void* receive_msg_loop(void* serv_arg) {
 
     string endpoint = create_endpoint(EndpointType::PARRENT_PUB, child_pid);
     server_ptr->subscriber_ = make_unique<Socket>(server_ptr->context_, SocketType::SUBSCRIBER, endpoint);
+    server_ptr->tree_.add_to(0, {0, child_pid});
 
     while (true) {
       Message msg = server_ptr->subscriber_->receive();
@@ -99,4 +101,38 @@ pid_t Server::pid() const {
 
 Message Server::last_message() const {
   return last_message_;
+}
+
+bool Server::check(int id) {
+  Message msg(CommandType::RETURN, id, 0);
+  send(msg);
+  sleep(MESSAGE_WAITING_TIME);
+  if (last_message_ == msg) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+void Server::create_child_cmd(int id, int parrent_id) {
+  if (tree_.find(id)) {
+    cout << "«Error: Already exists" << endl;
+    return;
+  }
+  if (!tree_.find(parrent_id)) {
+    cout << "«Error: Parent not found" << endl;
+    return;
+  }
+  if (!check(parrent_id)) {
+    cout << "Error: Parent is unavailable" << endl;
+    return;
+  }
+  send(Message(CommandType::CREATE_CHILD, parrent_id, id));
+  sleep(2 * MESSAGE_WAITING_TIME);
+  if (last_message_.command == CommandType::CREATE_CHILD) {
+    tree_.add_to(parrent_id, {id, last_message_.value});
+    cout << "OK: " << last_message_.value << endl;
+  } else {
+    cout << "Error: New child is unavailable" << endl;
+  }
 }
