@@ -6,6 +6,7 @@
 #include <zmq.h>
 
 #include <iostream>
+#include <tuple>
 
 using namespace std;
 
@@ -93,6 +94,22 @@ void disconnect_zmq_socket(void* socket, string endpoint) {
   if (zmq_disconnect(socket, endpoint.data()) != 0) {
     throw runtime_error("Can't disconnect socket");
   }
+}
+
+int counter = 0;
+Message::Message() {
+  uniq_num = counter++;
+}
+
+Message::Message(CommandType command_a, int to_id_a, int value_a)
+    : Message() {
+  command = command_a;
+  to_id = to_id_a;
+  value = value_a;
+}
+
+bool operator==(const Message& lhs, const Message& rhs) {
+  return tie(lhs.command, lhs.to_id, lhs.value, lhs.uniq_num) == tie(rhs.command, rhs.to_id, rhs.value, rhs.uniq_num);
 }
 
 void create_zmq_msg(zmq_msg_t* zmq_msg, Message msg) {

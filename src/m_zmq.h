@@ -34,11 +34,13 @@ struct Message {
   int to_id;
   int value;
   bool go_up = false;
+  int uniq_num;
 
-  Message() {}
-  Message(CommandType command, int to_id, int value)
-      : command(command), to_id(to_id), value(value) {}
+  Message();
+  Message(CommandType command_a, int to_id_a, int value_a);
 };
+
+bool operator==(const Message& lhs, const Message& rhs);
 
 void send_zmq_msg(void* socket, Message msg);
 Message get_zmq_msg(void* socket);

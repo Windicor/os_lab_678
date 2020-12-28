@@ -12,6 +12,7 @@ class Server {
   ~Server();
 
   pid_t pid() const;
+  Message last_message() const;
 
   void send(Message message);
   Message receive();
@@ -26,4 +27,6 @@ class Server {
 
   pthread_t receive_msg_loop_id;
   bool terminated_ = false;
+
+  Message last_message_;
 };

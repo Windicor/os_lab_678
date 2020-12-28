@@ -42,6 +42,7 @@ void* receive_msg_loop(void* serv_arg) {
           throw runtime_error("Can't receive message");
         }
       }
+      server_ptr->last_message_ = msg;
       cout << "Message on server: " << static_cast<int>(msg.command) << " " << msg.to_id << " " << msg.value << endl;
     }
 
@@ -84,6 +85,7 @@ Server::~Server() {
 }
 
 void Server::send(Message message) {
+  message.go_up = false;
   publiser_->send(message);
 }
 
@@ -93,4 +95,8 @@ Message Server::receive() {
 
 pid_t Server::pid() const {
   return pid_;
+}
+
+Message Server::last_message() const {
+  return last_message_;
 }

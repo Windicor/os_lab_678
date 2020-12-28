@@ -9,6 +9,7 @@
 using namespace std;
 
 const int ERR_TERMINATED = 1;
+const double MESSAGE_WAITING_TIME = 1;
 
 Server* server_ptr = nullptr;
 void TerminateByUser(int) {
@@ -23,7 +24,14 @@ void process_cmd(Server& server, string cmd) {
   if (cmd == "check") {
     int to_id, value;
     cin >> to_id >> value;
-    server.send(Message(CommandType::RETURN, to_id, value));
+    Message msg(CommandType::RETURN, to_id, value);
+    server.send(msg);
+    sleep(MESSAGE_WAITING_TIME);
+    if (server.last_message() == msg) {
+      cout << "OK" << endl;
+    } else {
+      cout << "NOT_OK" << endl;
+    }
   } else if (cmd == "create") {
     int id, parrent_id;
     cin >> id >> parrent_id;
