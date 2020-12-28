@@ -19,6 +19,20 @@ void TerminateByUser(int) {
   exit(0);
 }
 
+void process_cmd(Server& server, string cmd) {
+  if (cmd == "check") {
+    int to_id, value;
+    cin >> to_id >> value;
+    server.send(Message(CommandType::RETURN, to_id, value));
+  } else if (cmd == "create") {
+    int id, parrent_id;
+    cin >> id >> parrent_id;
+    server.send(Message(CommandType::CREATE_CHILD, parrent_id, id));
+  } else {
+    cout << "It's not a command" << endl;
+  }
+}
+
 int main() {
   try {
     if (signal(SIGINT, TerminateByUser) == SIG_ERR) {
@@ -32,15 +46,15 @@ int main() {
     server_ptr = &server;
     cerr << to_string(getpid()) + " Server is started correctly"s << endl;
 
-    int cmd;
+    string cmd;
     while (cin >> cmd) {
-      server.send(Message{CommandType::REQ_REP, cmd, cmd});
+      process_cmd(server, cmd);
     }
 
   } catch (exception& ex) {
     cerr << to_string(getpid()) + " Server exception: "s << ex.what() << "\nTerminated by exception" << endl;
     exit(ERR_TERMINATED);
   }
-  cerr << to_string(getpid()) + " Server is ended correctly"s << endl;
+  cerr << to_string(getpid()) + " Server is finished correctly"s << endl;
   return 0;
 }

@@ -7,6 +7,23 @@ using namespace std;
 
 const int ERR_TERMINATED = 1;
 
+void process_msg(Client& client, Message msg) {
+  switch (msg.command) {
+    case CommandType::ERROR:
+      throw runtime_error("Error message recieved");
+    case CommandType::RETURN:
+      cout << to_string(getpid()) + " Client message: "s << static_cast<int>(msg.command) << " " << msg.to_id << " " << msg.value << endl;
+      client.send_up(msg);
+      break;
+    case CommandType::CREATE_CHILD:
+      client.send_up(msg);
+      client.add_child(msg.value);
+      break;
+    default:
+      throw logic_error("Not implemented message command");
+  }
+}
+
 int main(int argc, char const* argv[]) {
   if (argc != 3) {
     cerr << argc;
@@ -19,14 +36,21 @@ int main(int argc, char const* argv[]) {
 
     while (true) {
       Message msg = client.receive();
-      cout << to_string(getpid()) + " Client message: "s << static_cast<int>(msg.command) << " " << msg.to_id << " " << msg.value << endl;
-      client.send_up(msg);
+      if (msg.to_id != client.id()) {
+        if (msg.go_up) {
+          client.send_up(msg);
+        } else {
+          client.send_down(msg);
+        }
+        continue;
+      }
+      process_msg(client, msg);
     }
 
   } catch (exception& ex) {
     cerr << to_string(getpid()) + " Client exception: "s << ex.what() << "\nTerminated by exception" << endl;
     exit(ERR_TERMINATED);
   }
-  cerr << to_string(getpid()) + " Client is ended correctly"s << endl;
+  cerr << to_string(getpid()) + " Client is finished correctly"s << endl;
   return 0;
 }

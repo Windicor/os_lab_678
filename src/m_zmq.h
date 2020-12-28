@@ -25,13 +25,19 @@ void disconnect_zmq_socket(void* socket, std::string endpoint);
 
 enum class CommandType {
   ERROR,
-  REQ_REP
+  RETURN,
+  CREATE_CHILD
 };
 
 struct Message {
-  CommandType command;
+  CommandType command = CommandType::ERROR;
   int to_id;
   int value;
+  bool go_up = false;
+
+  Message() {}
+  Message(CommandType command, int to_id, int value)
+      : command(command), to_id(to_id), value(value) {}
 };
 
 void send_zmq_msg(void* socket, Message msg);

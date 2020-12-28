@@ -12,11 +12,14 @@ class Client {
   Client(int id, std::string parrent_endpoint);
   ~Client();
 
+  int id() const;
   pid_t pid() const;
 
   void send_up(Message message);
   void send_down(Message message);
   Message receive();
+
+  void add_child(int id);
 
  private:
   int id_;

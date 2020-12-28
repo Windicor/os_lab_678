@@ -5,15 +5,15 @@
 
 using namespace std;
 
-Socket::Socket(void* context, SocketType socket_type, ConnectionType connection_type, std::string endpoint)
-    : socket_type_(socket_type), connection_type_(connection_type), endpoint_(endpoint) {
+Socket::Socket(void* context, SocketType socket_type, std::string endpoint)
+    : socket_type_(socket_type), endpoint_(endpoint) {
   socket_ = create_zmq_socket(context, socket_type_);
-  switch (connection_type_) {
-    case ConnectionType::BIND:
-      bind_zmq_socket(socket_, endpoint_);
+  switch (socket_type_) {
+    case SocketType::PUBLISHER:
+      bind_zmq_socket(socket_, endpoint);
       break;
-    case ConnectionType::CONNECT:
-      connect_zmq_socket(socket_, endpoint_);
+    case SocketType::SUBSCRIBER:
+      connect_zmq_socket(socket_, endpoint);
       break;
     default:
       throw logic_error("Undefined connection type");
@@ -22,14 +22,6 @@ Socket::Socket(void* context, SocketType socket_type, ConnectionType connection_
 
 Socket::~Socket() {
   try {
-    switch (connection_type_) {
-      case ConnectionType::BIND:
-        unbind_zmq_socket(socket_, endpoint_);
-        break;
-      case ConnectionType::CONNECT:
-        disconnect_zmq_socket(socket_, endpoint_);
-        break;
-    }
     close_zmq_socket(socket_);
   } catch (exception& ex) {
     cerr << "Socket wasn't closed: " << ex.what() << endl;
@@ -49,6 +41,14 @@ Message Socket::receive() {
     return get_zmq_msg(socket_);
   } else {
     throw logic_error("PUB socket can't receive messages");
+  }
+}
+
+void Socket::subscribe(std::string endpoint) {
+  if (socket_type_ == SocketType::SUBSCRIBER) {
+    connect_zmq_socket(socket_, endpoint);
+  } else {
+    throw logic_error("Subscribe is only for SUB sockets");
   }
 }
 

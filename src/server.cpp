@@ -30,7 +30,7 @@ void* receive_msg_loop(void* serv_arg) {
     }
 
     string endpoint = create_endpoint(EndpointType::PARRENT_PUB, child_pid);
-    server_ptr->subscriber_ = make_unique<Socket>(server_ptr->context_, SocketType::SUBSCRIBER, ConnectionType::CONNECT, endpoint);
+    server_ptr->subscriber_ = make_unique<Socket>(server_ptr->context_, SocketType::SUBSCRIBER, endpoint);
 
     while (true) {
       Message msg = server_ptr->subscriber_->receive();
@@ -58,7 +58,7 @@ Server::Server() {
   context_ = create_zmq_context();
 
   string endpoint = create_endpoint(EndpointType::CHILD_PUB, getpid());
-  publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, ConnectionType::BIND, endpoint);
+  publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, endpoint);
 
   if (pthread_create(&receive_msg_loop_id, 0, receive_msg_loop, this) != 0) {
     throw runtime_error("Can't run second thread");

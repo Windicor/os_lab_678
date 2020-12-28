@@ -96,8 +96,8 @@ void disconnect_zmq_socket(void* socket, string endpoint) {
 }
 
 void create_zmq_msg(zmq_msg_t* zmq_msg, Message msg) {
-  zmq_msg_init_size(zmq_msg, sizeof(msg));
-  memcpy(zmq_msg_data(zmq_msg), &msg, sizeof(msg));
+  zmq_msg_init_size(zmq_msg, sizeof(Message));
+  memcpy(zmq_msg_data(zmq_msg), &msg, sizeof(Message));
 }
 
 void send_zmq_msg(void* socket, Message msg) {
