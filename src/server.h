@@ -21,8 +21,9 @@ class Server {
   bool check(int id);
   void create_child_cmd(int id, int parrent_id);
   void remove_child_cmd(int id);
+  void print_tree();
 
-  friend void* receive_msg_loop(void* serv_arg);
+  friend void* second_thread(void* serv_arg);
 
  private:
   pid_t pid_;

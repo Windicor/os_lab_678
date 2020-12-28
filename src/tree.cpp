@@ -53,17 +53,16 @@ bool IdTreeNode::find(int id) const {
   }
 }
 
-std::pair<int, pid_t> IdTreeNode::get(int id) const {
+std::pair<int, pid_t>& IdTreeNode::get(int id) {
   if (id_.first == id) {
     return id_;
   } else {
     for (const auto& ch_ptr : childs_) {
-      std::pair<int, pid_t> res = ch_ptr->get(id);
-      if (res.first != BAD_RES.first || res.second != BAD_RES.second) {
-        return res;
+      if (ch_ptr->find(id)) {
+        return ch_ptr->get(id);
       }
     }
-    return BAD_RES;
+    throw std::runtime_error("Can't get value");
   }
 }
 
@@ -116,11 +115,11 @@ bool IdTree::find(int id) const {
   return false;
 }
 
-std::pair<int, pid_t> IdTree::get(int id) const {
+std::pair<int, pid_t>& IdTree::get(int id) {
   if (head_) {
     return head_->get(id);
   }
-  return BAD_RES;
+  throw std::runtime_error("Can't get value");
 }
 
 void IdTree::print(std::ostream& out) const {

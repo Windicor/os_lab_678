@@ -35,6 +35,8 @@ void process_cmd(Server& server, string cmd) {
     int id;
     cin >> id;
     server.remove_child_cmd(id);
+  } else if (cmd == "print_tree") {
+    server.print_tree();
   } else {
     cout << "It's not a command" << endl;
   }

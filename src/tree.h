@@ -16,7 +16,7 @@ class IdTreeNode {
   bool add_to(int parrent_id, std::pair<int, pid_t> new_id);
   bool remove(int id);
   bool find(int id) const;
-  std::pair<int, pid_t> get(int id) const;
+  std::pair<int, pid_t>& get(int id);
   void print(std::ostream& out, int depth) const;
   std::unordered_set<pid_t> get_all() const;
 
@@ -32,7 +32,7 @@ class IdTree {
   bool add_to(int parrent_id, std::pair<int, pid_t> new_id);
   bool remove(int id);
   bool find(int id) const;
-  std::pair<int, pid_t> get(int id) const;
+  std::pair<int, pid_t>& get(int id);
   void print(std::ostream& out = std::cout) const;
   std::unordered_set<pid_t> get_all() const;
 

@@ -15,7 +15,7 @@ const int ERR_EXEC = 3;
 const string CLIENT_EXE = "./client";
 const double MESSAGE_WAITING_TIME = 1;
 
-void* receive_msg_loop(void* serv_arg) {
+void* second_thread(void* serv_arg) {
   Server* server_ptr = (Server*)serv_arg;
   pid_t server_pid = server_ptr->pid();
   try {
@@ -46,6 +46,21 @@ void* receive_msg_loop(void* serv_arg) {
       }
       server_ptr->last_message_ = msg;
       cerr << "Message on server: " << static_cast<int>(msg.command) << " " << msg.to_id << " " << msg.value << endl;
+
+      switch (msg.command) {
+        case CommandType::CREATE_CHILD: {
+          auto& pa = server_ptr->tree_.get(msg.to_id);
+          pa.second = msg.value;
+          cout << "OK: " << server_ptr->last_message_.value << endl;
+          break;
+        }
+        case CommandType::REMOVE_CHILD:
+          server_ptr->tree_.remove(msg.to_id);
+          cout << "OK" << endl;
+          break;
+        default:
+          break;
+      }
     }
 
   } catch (exception& ex) {
@@ -63,7 +78,7 @@ Server::Server() {
   string endpoint = create_endpoint(EndpointType::CHILD_PUB, getpid());
   publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, endpoint);
 
-  if (pthread_create(&receive_msg_loop_id, 0, receive_msg_loop, this) != 0) {
+  if (pthread_create(&receive_msg_loop_id, 0, second_thread, this) != 0) {
     throw runtime_error("Can't run second thread");
   }
 }
@@ -132,13 +147,7 @@ void Server::create_child_cmd(int id, int parrent_id) {
     return;
   }
   send(Message(CommandType::CREATE_CHILD, parrent_id, id));
-  sleep(2 * MESSAGE_WAITING_TIME);
-  if (last_message_.command == CommandType::CREATE_CHILD) {
-    tree_.add_to(parrent_id, {id, last_message_.value});
-    cout << "OK: " << last_message_.value << endl;
-  } else {
-    cout << "Error: New child is unavailable" << endl;
-  }
+  tree_.add_to(parrent_id, {id, 0});
 }
 
 void Server::remove_child_cmd(int id) {
@@ -155,11 +164,8 @@ void Server::remove_child_cmd(int id) {
     return;
   }
   send(Message(CommandType::REMOVE_CHILD, id, 0));
-  sleep(2 * MESSAGE_WAITING_TIME);
-  if (last_message_.command == CommandType::REMOVE_CHILD) {
-    tree_.remove(id);
-    cout << "OK" << endl;
-  } else {
-    cout << "Error: Node is unavailable" << endl;
-  }
+}
+
+void Server::print_tree() {
+  tree_.print();
 }
