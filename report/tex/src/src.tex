@@ -1,0 +1,911 @@
+\section{Общий метод и алгоритм решения}
+
+Для работы с очередями используется ZMQ, программа собирается при помощи Makefile. Управляющий узел – server, вычислительные узлы – client. client и server - отдельные программы, причем новые вычислительные узлы создаются через fork() и execl(...). Для удобной работы с ZMQ создадим удобные обёртки над функциями библиотеки (заголовочный файл m\_zmq.h). Сокеты будем создавать через ipc. В качестве типа сокетов возьмём Publish-Subscribe сокеты как наиболее подходящие. Также напишем классы Socket, Client и Server для работы на высоком уровне. Для хранения дерева общего вида будем использовать собственный класс IdTree.
+
+
+При запуске программы создаётся сервер (управляющий узел). Затем создаётся вычислительный узел - корень дерева. Сервер работает в двух потоках: первый - работа с пользователем и отправка сообщений, второй - приём сообщений. Endpoint сокета создаётся по pid процесса вычислительного узла. При добавлении и удалении узлов происходит работа с IdTree, это необходимо, чтобы быстро проверять существование узла. Получив сообщение, вычислительный узел может либо отправить его обратно с новыми данными, либо отправить вниз своим детям (это нужно для операции heartbit и корректного уничтожения дерева процессов).
+
+\pagebreak
+
+\section{Исходный код}
+
+\textbf{m\_zmq.h}
+
+\begin{lstlisting}[language=C++]
+
+#pragma once
+
+#include <string>
+
+void* create_zmq_context();
+void destroy_zmq_context(void* context);
+
+enum class SocketType {
+  PUBLISHER,
+  SUBSCRIBER
+};
+void* create_zmq_socket(void* context, SocketType type);
+void close_zmq_socket(void* socket);
+
+enum class EndpointType {
+  CHILD_PUB,
+  PARRENT_PUB,
+};
+std::string create_endpoint(EndpointType type, pid_t id);
+
+void bind_zmq_socket(void* socket, std::string endpoint);
+void unbind_zmq_socket(void* socket, std::string endpoint);
+void connect_zmq_socket(void* socket, std::string endpoint);
+void disconnect_zmq_socket(void* socket, std::string endpoint);
+
+enum class CommandType {
+  ERROR,
+  RETURN,
+  CREATE_CHILD,
+  REMOVE_CHILD,
+  TIMER_TIME,
+  TIMER_START,
+  TIMER_STOP,
+  HEARTBIT
+};
+
+struct Message {
+  CommandType command = CommandType::ERROR;
+  int to_id;
+  int value;
+  bool go_up = false;
+  int uniq_num;
+
+  Message();
+  Message(CommandType command_a, int to_id_a, int value_a);
+};
+
+bool operator==(const Message& lhs, const Message& rhs);
+
+void send_zmq_msg(void* socket, Message msg);
+Message get_zmq_msg(void* socket);
+
+\end{lstlisting}
+
+\textbf{m\_zmq.cpp}
+
+\begin{lstlisting}[language=C++]
+
+#include "m_zmq.h"
+
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+#include <zmq.h>
+
+#include <iostream>
+#include <tuple>
+
+using namespace std;
+
+void* create_zmq_context() {
+  void* context = zmq_ctx_new();
+  if (context == NULL) {
+    throw runtime_error("Can't create new context. pid:" + to_string(getpid()));
+  }
+  return context;
+}
+
+void destroy_zmq_context(void* context) {
+  if (zmq_ctx_destroy(context) != 0) {
+    throw runtime_error("Can't destroy context. pid:" + to_string(getpid()));
+  }
+}
+
+int get_zmq_socket_type(SocketType type) {
+  switch (type) {
+    case SocketType::PUBLISHER:
+      return ZMQ_PUB;
+    case SocketType::SUBSCRIBER:
+      return ZMQ_SUB;
+    default:
+      throw logic_error("Undefined socket type");
+  }
+}
+
+void* create_zmq_socket(void* context, SocketType type) {
+  int zmq_type = get_zmq_socket_type(type);
+  void* socket = zmq_socket(context, zmq_type);
+  if (socket == NULL) {
+    throw runtime_error("Can't create socket");
+  }
+  if (zmq_type == ZMQ_SUB) {
+    if (zmq_setsockopt(socket, ZMQ_SUBSCRIBE, 0, 0) == -1) {
+      throw runtime_error("Can't set ZMQ_SUBSCRIBE option");
+    }
+    int linger_period = 0;
+    if (zmq_setsockopt(socket, ZMQ_LINGER, &linger_period, sizeof(int)) == -1) {
+      throw runtime_error("Can't set ZMQ_LINGER option");
+    }
+  }
+  return socket;
+}
+
+void close_zmq_socket(void* socket) {
+  //cerr << "closing socket..." << endl;
+  sleep(1);  // Don't comment it, because sometimes zmq_close blocks
+  if (zmq_close(socket) != 0) {
+    throw runtime_error("Can't close socket");
+  }
+}
+
+string create_endpoint(EndpointType type, pid_t id) {
+  switch (type) {
+    case EndpointType::PARRENT_PUB:
+      return "ipc://tmp/parrent_pub_"s + to_string(id);
+    case EndpointType::CHILD_PUB:
+      return "ipc://tmp/child_pub_"s + to_string(id);
+    default:
+      throw logic_error("Undefined endpoint type");
+  }
+}
+
+void bind_zmq_socket(void* socket, string endpoint) {
+  if (zmq_bind(socket, endpoint.data()) != 0) {
+    throw runtime_error("Can't bind socket");
+  }
+}
+
+void unbind_zmq_socket(void* socket, string endpoint) {
+  if (zmq_unbind(socket, endpoint.data()) != 0) {
+    throw runtime_error("Can't unbind socket");
+  }
+}
+
+void connect_zmq_socket(void* socket, string endpoint) {
+  if (zmq_connect(socket, endpoint.data()) != 0) {
+    throw runtime_error("Can't connect socket");
+  }
+}
+
+void disconnect_zmq_socket(void* socket, string endpoint) {
+  if (zmq_disconnect(socket, endpoint.data()) != 0) {
+    throw runtime_error("Can't disconnect socket");
+  }
+}
+
+int counter = 0;
+Message::Message() {
+  uniq_num = counter++;
+}
+
+Message::Message(CommandType command_a, int to_id_a, int value_a)
+    : Message() {
+  command = command_a;
+  to_id = to_id_a;
+  value = value_a;
+}
+
+bool operator==(const Message& lhs, const Message& rhs) {
+  return tie(lhs.command, lhs.to_id, lhs.value, lhs.uniq_num) == tie(rhs.command, rhs.to_id, rhs.value, rhs.uniq_num);
+}
+
+void create_zmq_msg(zmq_msg_t* zmq_msg, Message msg) {
+  zmq_msg_init_size(zmq_msg, sizeof(Message));
+  memcpy(zmq_msg_data(zmq_msg), &msg, sizeof(Message));
+}
+
+void send_zmq_msg(void* socket, Message msg) {
+  zmq_msg_t zmq_msg;
+  create_zmq_msg(&zmq_msg, msg);
+  if (!zmq_msg_send(&zmq_msg, socket, 0)) {
+    throw runtime_error("Can't send message");
+  }
+  zmq_msg_close(&zmq_msg);
+}
+
+Message get_zmq_msg(void* socket) {
+  zmq_msg_t zmq_msg;
+  zmq_msg_init(&zmq_msg);
+  if (zmq_msg_recv(&zmq_msg, socket, 0) == -1) {
+    return Message{CommandType::ERROR, 0, 0};
+  }
+  Message msg;
+  memcpy(&msg, zmq_msg_data(&zmq_msg), sizeof(Message));
+  zmq_msg_close(&zmq_msg);
+  return msg;
+}
+
+\end{lstlisting}
+
+\textbf{socket.h}
+
+\begin{lstlisting}[language=C++]
+
+#pragma once
+
+#include <unistd.h>
+
+#include <memory>
+#include <unordered_map>
+
+#include "socket.h"
+#include "tree.h"
+
+class Server {
+ public:
+  Server();
+  ~Server();
+
+  pid_t pid() const;
+  Message last_message() const;
+
+  void send(Message message);
+  Message receive();
+
+  bool check(int id);
+  void create_child_cmd(int id, int parrent_id);
+  void remove_child_cmd(int id);
+  void exec_cmd(int id, CommandType type);
+  void heartbit_cmd(int time);
+  void print_tree();
+
+  friend void* second_thread(void* serv_arg);
+
+ private:
+  pid_t pid_;
+  void* context_ = nullptr;
+  std::unique_ptr<Socket> publiser_;
+  std::unique_ptr<Socket> subscriber_;
+
+  pthread_t receive_msg_loop_id;
+  bool terminated_ = false;
+
+  Message last_message_;
+  IdTree tree_;
+  std::unordered_map<int, bool> map_for_check_;
+};
+
+\end{lstlisting}
+
+\textbf{client.h}
+
+\begin{lstlisting}[language=C++]
+
+#pragma once
+
+#include <unistd.h>
+
+#include <chrono>
+#include <memory>
+#include <string>
+
+#include "socket.h"
+
+class Client {
+ public:
+  Client(int id, std::string parrent_endpoint);
+  ~Client();
+
+  int id() const;
+  pid_t pid() const;
+
+  void send_up(Message message);
+  void send_down(Message message);
+  Message receive();
+
+  void start_timer();
+  void stop_timer();
+  int get_time();
+  void heartbit(int time);
+
+  void
+  add_child(int id);
+
+ private:
+  int id_;
+  pid_t pid_;
+  void* context_ = nullptr;
+  std::unique_ptr<Socket> child_publiser_;
+  std::unique_ptr<Socket> parrent_publiser_;
+  std::unique_ptr<Socket> subscriber_;
+
+  bool is_timer_started = false;
+  std::chrono::steady_clock::time_point start_;
+  std::chrono::steady_clock::time_point finish_;
+
+  bool terminated_ = false;
+};
+
+\end{lstlisting}
+
+\textbf{client.cpp}
+
+\begin{lstlisting}[language=C++]
+
+#include "client.h"
+
+#include <unistd.h>
+
+#include <iostream>
+
+#include "m_zmq.h"
+
+using namespace std;
+
+const string CLIENT_EXE = "./client";
+const double MESSAGE_WAITING_TIME = 1;
+
+Client::Client(int id, std::string parrent_endpoint) {
+  id_ = id;
+  pid_ = getpid();
+  cerr << to_string(pid_) + " Starting client..."s << endl;
+  context_ = create_zmq_context();
+
+  string endpoint = create_endpoint(EndpointType::CHILD_PUB, getpid());
+  child_publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, endpoint);
+  endpoint = create_endpoint(EndpointType::PARRENT_PUB, getpid());
+  parrent_publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, endpoint);
+
+  subscriber_ = make_unique<Socket>(context_, SocketType::SUBSCRIBER, parrent_endpoint);
+
+  sleep(MESSAGE_WAITING_TIME);
+  send_up(Message(CommandType::CREATE_CHILD, id, getpid()));
+}
+
+Client::~Client() {
+  if (terminated_) {
+    cerr << to_string(pid_) + " Client double termination"s << endl;
+    return;
+  }
+
+  cerr << to_string(pid_) + " Destroying client..."s << endl;
+  terminated_ = true;
+
+  sleep(MESSAGE_WAITING_TIME);
+  try {
+    child_publiser_ = nullptr;
+    parrent_publiser_ = nullptr;
+    subscriber_ = nullptr;
+    destroy_zmq_context(context_);
+  } catch (exception& ex) {
+    cerr << to_string(pid_) + " " + " Client wasn't destroyed: "s << ex.what() << endl;
+  }
+}
+
+void Client::send_up(Message message) {
+  message.go_up = true;
+  parrent_publiser_->send(message);
+}
+
+void Client::send_down(Message message) {
+  message.go_up = false;
+  child_publiser_->send(message);
+}
+
+Message Client::receive() {
+  Message msg = subscriber_->receive();
+  return msg;
+}
+
+void Client::add_child(int id) {
+  pid_t child_pid = fork();
+  if (child_pid == -1) {
+    throw runtime_error("Can't fork");
+  }
+  if (child_pid == 0) {
+    execl(CLIENT_EXE.data(), CLIENT_EXE.data(), to_string(id).data(), child_publiser_->endpoint().data(), NULL);
+    throw runtime_error("Can't execl ");
+  }
+
+  string endpoint = create_endpoint(EndpointType::PARRENT_PUB, child_pid);
+  subscriber_->subscribe(endpoint);
+}
+
+void Client::start_timer() {
+  is_timer_started = true;
+  start_ = std::chrono::steady_clock::now();
+}
+
+void Client::stop_timer() {
+  is_timer_started = false;
+  finish_ = std::chrono::steady_clock::now();
+}
+
+int Client::get_time() {
+  if (is_timer_started) {
+    finish_ = std::chrono::steady_clock::now();
+  }
+  return std::chrono::duration_cast<std::chrono::milliseconds>(finish_ - start_).count();
+}
+
+void Client::heartbit(int time) {
+  sleep((double)time / 1000);  //s to ms
+  send_up(Message(CommandType::HEARTBIT, id_, 0));
+}
+
+int Client::id() const {
+  return id_;
+}
+
+pid_t Client::pid() const {
+  return pid_;
+}
+
+\end{lstlisting}
+
+\textbf{client\_main.cpp}
+
+\begin{lstlisting}[language=C++]
+
+#include <signal.h>
+
+#include <iostream>
+#include <string>
+
+#include "client.h"
+
+using namespace std;
+
+const int ERR_TERMINATED = 1;
+const int UNIVERSAL_MESSAGE_ID = -256;
+
+Client* client_ptr = nullptr;
+void TerminateByUser(int) {
+  if (client_ptr != nullptr) {
+    client_ptr->~Client();
+  }
+  cerr << to_string(getpid()) + " Terminated by user"s << endl;
+  exit(0);
+}
+
+void process_msg(Client& client, const Message msg) {
+  cerr << to_string(getpid()) + " Client message: "s << static_cast<int>(msg.command) << " " << msg.to_id << " " << msg.value << endl;
+  switch (msg.command) {
+    case CommandType::ERROR:
+      throw runtime_error("Error message recieved");
+    case CommandType::RETURN:
+      client.send_up(msg);
+      break;
+    case CommandType::CREATE_CHILD:
+      client.add_child(msg.value);
+      break;
+    case CommandType::REMOVE_CHILD: {
+      if (msg.to_id != UNIVERSAL_MESSAGE_ID) {
+        client.send_up(msg);
+      }
+      Message tmp = msg;
+      tmp.to_id = UNIVERSAL_MESSAGE_ID;
+      client.send_down(tmp);
+      TerminateByUser(0);
+      break;
+    }
+    case CommandType::TIMER_START:
+      client.start_timer();
+      client.send_up(msg);
+      break;
+    case CommandType::TIMER_STOP:
+      client.stop_timer();
+      client.send_up(msg);
+      break;
+    case CommandType::TIMER_TIME: {
+      int val = client.get_time();
+      client.send_up(Message(CommandType::TIMER_TIME, client.id(), val));
+      break;
+    }
+    case CommandType::HEARTBIT:
+      client.send_down(msg);
+      client.heartbit(msg.value);
+      break;
+    default:
+      throw logic_error("Not implemented message command");
+  }
+}
+
+int main(int argc, char const* argv[]) {
+  if (argc != 3) {
+    cerr << argc;
+    cerr << "USAGE: " << argv[0] << " <id> <parrent_pub_endpoint" << endl;
+  }
+
+  try {
+    if (signal(SIGINT, TerminateByUser) == SIG_ERR) {
+      throw runtime_error("Can't set SIGINT signal");
+    }
+    if (signal(SIGSEGV, TerminateByUser) == SIG_ERR) {
+      throw runtime_error("Can't set SIGSEGV signal");
+    }
+
+    Client client(stoi(argv[1]), string(argv[2]));
+    client_ptr = &client;
+    cerr << to_string(getpid()) + " Client is started correctly"s << endl;
+
+    while (true) {
+      Message msg = client.receive();
+      if (msg.to_id != client.id() && msg.to_id != UNIVERSAL_MESSAGE_ID) {
+        if (msg.go_up) {
+          client.send_up(msg);
+        } else {
+          client.send_down(msg);
+        }
+        continue;
+      }
+      process_msg(client, msg);
+    }
+
+  } catch (exception& ex) {
+    cerr << to_string(getpid()) + " Client exception: "s << ex.what() << "\nTerminated by exception" << endl;
+    exit(ERR_TERMINATED);
+  }
+  cerr << to_string(getpid()) + " Client is finished correctly"s << endl;
+  return 0;
+}
+
+\end{lstlisting}
+
+\textbf{server.h}
+
+\begin{lstlisting}[language=C++]
+
+#pragma once
+
+#include <unistd.h>
+
+#include <memory>
+#include <unordered_map>
+
+#include "socket.h"
+#include "tree.h"
+
+class Server {
+ public:
+  Server();
+  ~Server();
+
+  pid_t pid() const;
+  Message last_message() const;
+
+  void send(Message message);
+  Message receive();
+
+  bool check(int id);
+  void create_child_cmd(int id, int parrent_id);
+  void remove_child_cmd(int id);
+  void exec_cmd(int id, CommandType type);
+  void heartbit_cmd(int time);
+  void print_tree();
+
+  friend void* second_thread(void* serv_arg);
+
+ private:
+  pid_t pid_;
+  void* context_ = nullptr;
+  std::unique_ptr<Socket> publiser_;
+  std::unique_ptr<Socket> subscriber_;
+
+  pthread_t receive_msg_loop_id;
+  bool terminated_ = false;
+
+  Message last_message_;
+  IdTree tree_;
+  std::unordered_map<int, bool> map_for_check_;
+};
+
+\end{lstlisting}
+
+\textbf{server.cpp}
+
+\begin{lstlisting}[language=C++]
+
+#include "server.h"
+
+#include <pthread.h>
+#include <signal.h>
+#include <unistd.h>
+
+#include <iostream>
+
+#include "m_zmq.h"
+
+using namespace std;
+
+const int ERR_LOOP = 2;
+const int ERR_EXEC = 3;
+const string CLIENT_EXE = "./client";
+const double MESSAGE_WAITING_TIME = 1;
+const int UNIVERSAL_MESSAGE_ID = -256;
+
+void* second_thread(void* serv_arg) {
+  Server* server_ptr = (Server*)serv_arg;
+  pid_t server_pid = server_ptr->pid();
+  try {
+    pid_t child_pid = fork();
+    if (child_pid == -1) {
+      throw runtime_error("Can't fork");
+    }
+    if (child_pid == 0) {
+      execl(CLIENT_EXE.data(), CLIENT_EXE.data(), "0", server_ptr->publiser_->endpoint().data(), NULL);
+      cerr << "Can't execl "s + CLIENT_EXE << endl;
+      kill(server_pid, SIGINT);
+      exit(ERR_EXEC);
+    }
+
+    string endpoint = create_endpoint(EndpointType::PARRENT_PUB, child_pid);
+    server_ptr->subscriber_ = make_unique<Socket>(server_ptr->context_, SocketType::SUBSCRIBER, endpoint);
+    server_ptr->tree_.add_to(0, {0, child_pid});
+
+    while (true) {
+      Message msg = server_ptr->subscriber_->receive();
+      if (msg.command == CommandType::ERROR) {
+        if (server_ptr->terminated_) {
+          return NULL;
+        } else {
+          cerr << "This bom" << endl;
+          throw runtime_error("Can't receive message");
+        }
+      }
+      server_ptr->last_message_ = msg;
+      cerr << "Message on server: " << static_cast<int>(msg.command) << " " << msg.to_id << " " << msg.value << endl;
+
+      switch (msg.command) {
+        case CommandType::CREATE_CHILD: {
+          auto& pa = server_ptr->tree_.get(msg.to_id);
+          pa.second = msg.value;
+          cout << "OK: " << server_ptr->last_message_.value << endl;
+          break;
+        }
+        case CommandType::REMOVE_CHILD:
+          server_ptr->tree_.remove(msg.to_id);
+          cout << "OK" << endl;
+          break;
+        case CommandType::TIMER_START:
+          cout << "OK:" << msg.to_id << endl;
+          break;
+        case CommandType::TIMER_STOP:
+          cout << "OK:" << msg.to_id << endl;
+          break;
+        case CommandType::TIMER_TIME: {
+          cout << "OK:" << msg.to_id << ": " << msg.value << endl;
+          break;
+        }
+        case CommandType::HEARTBIT:
+          server_ptr->map_for_check_[msg.to_id] = true;
+          break;
+        default:
+          break;
+      }
+    }
+
+  } catch (exception& ex) {
+    cerr << "Server exctption: " << ex.what() << "\nTerminated by exception on server receive loop" << endl;
+    exit(ERR_LOOP);
+  }
+  return NULL;
+}
+
+Server::Server() {
+  pid_ = getpid();
+  cerr << to_string(pid_) + " Starting server..."s << endl;
+  context_ = create_zmq_context();
+
+  string endpoint = create_endpoint(EndpointType::CHILD_PUB, getpid());
+  publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, endpoint);
+
+  if (pthread_create(&receive_msg_loop_id, 0, second_thread, this) != 0) {
+    throw runtime_error("Can't run second thread");
+  }
+}
+
+Server::~Server() {
+  if (terminated_) {
+    cerr << to_string(pid_) + " Server double termination" << endl;
+    return;
+  }
+
+  cerr << to_string(pid_) + " Destroying server..."s << endl;
+  terminated_ = true;
+
+  for (pid_t pid : tree_.get_all_second()) {
+    kill(pid, SIGINT);
+  }
+
+  try {
+    publiser_ = nullptr;
+    subscriber_ = nullptr;
+    destroy_zmq_context(context_);
+  } catch (exception& ex) {
+    cerr << "Server wasn't destroyed: " << ex.what() << endl;
+  }
+}
+
+void Server::send(Message message) {
+  message.go_up = false;
+  publiser_->send(message);
+}
+
+Message Server::receive() {
+  return subscriber_->receive();
+}
+
+pid_t Server::pid() const {
+  return pid_;
+}
+
+Message Server::last_message() const {
+  return last_message_;
+}
+
+bool Server::check(int id) {
+  Message msg(CommandType::RETURN, id, 0);
+  send(msg);
+  sleep(MESSAGE_WAITING_TIME);
+  if (last_message_ == msg) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+void Server::create_child_cmd(int id, int parrent_id) {
+  if (tree_.find(id)) {
+    cout << "Error: Already exists" << endl;
+    return;
+  }
+  if (!tree_.find(parrent_id)) {
+    cout << "Error: Parent not found" << endl;
+    return;
+  }
+  if (!check(parrent_id)) {
+    cout << "Error: Parent is unavailable" << endl;
+    return;
+  }
+  send(Message(CommandType::CREATE_CHILD, parrent_id, id));
+  tree_.add_to(parrent_id, {id, 0});
+}
+
+void Server::remove_child_cmd(int id) {
+  if (id == 0) {
+    cout << "Can't remove zero child" << endl;
+    return;
+  }
+  if (!tree_.find(id)) {
+    cout << "Error: Not found" << endl;
+    return;
+  }
+  if (!check(id)) {
+    cout << "Error: Node is unavailable" << endl;
+    return;
+  }
+  send(Message(CommandType::REMOVE_CHILD, id, 0));
+}
+
+void Server::exec_cmd(int id, CommandType type) {
+  if (!tree_.find(id)) {
+    cout << "Error: Not found" << endl;
+    return;
+  }
+  if (!check(id)) {
+    cout << "Error: Node is unavailable" << endl;
+    return;
+  }
+  send(Message(type, id, 0));
+}
+
+void Server::heartbit_cmd(int time) {
+  if (time < 1000) {
+    cout << "Too low time for heartbit" << endl;
+  }
+  send(Message(CommandType::HEARTBIT, UNIVERSAL_MESSAGE_ID, time));
+  auto uset = tree_.get_all_first();
+  for (int id : uset) {
+    map_for_check_[id] = false;
+  }
+  sleep(4 * (double)time / 1000);
+  for (auto& [id, bit] : map_for_check_) {
+    if (!bit) {
+      cout << "Heartbit: node " << id << " is unavailable now" << endl;
+    }
+    bit = false;
+  }
+  cout << "OK" << endl;
+}
+
+void Server::print_tree() {
+  tree_.print();
+}
+
+\end{lstlisting}
+
+\textbf{server\_main.cpp}
+
+\begin{lstlisting}[language=C++]
+
+#include <signal.h>
+
+#include <iostream>
+#include <string>
+
+#include "server.h"
+
+using namespace std;
+
+const int ERR_TERMINATED = 1;
+
+Server* server_ptr = nullptr;
+void TerminateByUser(int) {
+  if (server_ptr != nullptr) {
+    server_ptr->~Server();
+  }
+  cerr << to_string(getpid()) + " Terminated by user"s << endl;
+  exit(0);
+}
+
+void process_cmd(Server& server, string cmd) {
+  if (cmd == "check") {
+    int id;
+    cin >> id;
+    if (server.check(id)) {
+      cout << "OK" << endl;
+    } else {
+      cout << "NOT_OK" << endl;
+    }
+  } else if (cmd == "create") {
+    int id, parrent_id;
+    cin >> id >> parrent_id;
+    server.create_child_cmd(id, parrent_id);
+  } else if (cmd == "remove") {
+    int id;
+    cin >> id;
+    server.remove_child_cmd(id);
+  } else if (cmd == "exec") {
+    int id;
+    string sub_cmd;
+    cin >> id >> sub_cmd;
+    CommandType type;
+    if (sub_cmd == "time") {
+      type = CommandType::TIMER_TIME;
+    } else if (sub_cmd == "start") {
+      type = CommandType::TIMER_START;
+    } else if (sub_cmd == "stop") {
+      type = CommandType::TIMER_STOP;
+    } else {
+      cout << "Incorrect subcommand" << endl;
+      return;
+    }
+    server.exec_cmd(id, type);
+  } else if (cmd == "heartbit") {
+    int time;
+    cin >> time;
+    server.heartbit_cmd(time);
+  } else if (cmd == "print_tree") {
+    server.print_tree();
+  } else {
+    cout << "It's not a command" << endl;
+  }
+}
+
+int main() {
+  try {
+    if (signal(SIGINT, TerminateByUser) == SIG_ERR) {
+      throw runtime_error("Can't set SIGINT signal");
+    }
+    if (signal(SIGSEGV, TerminateByUser) == SIG_ERR) {
+      throw runtime_error("Can't set SIGSEGV signal");
+    }
+
+    Server server;
+    server_ptr = &server;
+    cerr << to_string(getpid()) + " Server is started correctly"s << endl;
+
+    string cmd;
+    while (cin >> cmd) {
+      process_cmd(server, cmd);
+    }
+
+  } catch (exception& ex) {
+    cerr << to_string(getpid()) + " Server exception: "s << ex.what() << "\nTerminated by exception" << endl;
+    exit(ERR_TERMINATED);
+  }
+  cerr << to_string(getpid()) + " Server is finished correctly"s << endl;
+  return 0;
+}
+
+
+\end{lstlisting}
+
+\pagebreak

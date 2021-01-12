@@ -1,0 +1,55 @@
+\section{Пример работы}
+
+Продемонстрирую процесс сборки программы и её работу:
+
+\begin{verbatim}
+
+windicor@Lina-HP:~$ make
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c server_main.cpp -o server_main.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c server.cpp -o server.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c m_zmq.cpp -o m_zmq.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c socket.cpp -o socket.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c tree.cpp -o tree.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable server_main.o server.o m_zmq.o socket.o tree.o -o server -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c client_main.cpp -o client_main.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c client.cpp -o client.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable client_main.o client.o m_zmq.o socket.o tree.o -o client -lzmq -lpthread
+windicor@Lina-HP:~$ ./server 2>log
+OK: 166
+create 0 0
+Error: Already exists
+create 1 0
+OK: 169
+create 2 1
+OK: 172
+create 3 1
+OK: 175
+create 4 2
+OK: 178
+remove 2
+OK
+exec 4 start
+Error: Not found
+exec 2 start
+Error: Not found
+exec 1 start
+OK:1
+exec 1 time
+OK:1: 20912
+exec 1 stop
+OK:1
+exec 1 time
+OK:1: 25960
+exec 1 time
+OK:1: 25960
+heartbit 1000
+OK
+heartbit 1000 //сделали kill -9 для узла 3
+Heartbit: node 3 is unavailable now
+OK
+
+\end{verbatim}
+
+\pagebreak
+
+
